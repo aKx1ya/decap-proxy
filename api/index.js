@@ -1,14 +1,11 @@
 const axios = require('axios');
 
 module.exports = async (req, res) => {
+  // 获取 CMS 传过来的 code 和 state
   const { code, state } = req.query;
 
-  // 1. 基础连通性测试
-  if (!code && !req.url.includes('auth')) {
-    return res.send('✅ 认证代理已激活！请从博客后台登录。');
-  }
-
-  // 2. 引导去 GitHub 登录
+  // 1. 如果没有 code，说明用户刚点登录按钮
+  // 我们直接让这个窗口重定向（跳转）到 GitHub 的授权页面
   if (!code) {
     const url = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=repo,user&state=${state}`;
     res.writeHead(302, { Location: url });
@@ -16,7 +13,8 @@ module.exports = async (req, res) => {
     return;
   }
 
-  // 3. 拿到 code 后去换 Token
+  // 2. 如果有了 code，说明用户已经在 GitHub 点了“授权”并跳回来了
+  // 我们拿着这个 code 去 GitHub 换取真正的令牌 (Token)
   try {
     const response = await axios.post('https://github.com/login/oauth/access_token', {
       client_id: process.env.GITHUB_CLIENT_ID,
@@ -29,7 +27,8 @@ module.exports = async (req, res) => {
       provider: 'github',
     };
 
-    // 返回给博客后台的握手脚本
+    // 这一段脚本是“握手”的核心：
+    // 它把 Token 传回给你的博客主窗口，传完之后这个弹出小窗口会自动关闭
     res.send(`
       <html><body><script>
         (function() {
